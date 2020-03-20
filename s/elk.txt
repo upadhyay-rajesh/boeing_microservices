@@ -1,0 +1,110 @@
+What is ELK? Need for it?
+
+The ELK Stack consists of three open-source products - Elasticsearch, Logstash, and Kibana from Elastic.
+Elasticsearch is a NoSQL database that is based on the Lucene search engine.
+Logstash is a log pipeline tool that accepts inputs from various sources, executes different transformations, and exports the data to various targets. It is a dynamic data collection pipeline with an extensible plugin ecosystem and strong Elasticsearch synergy
+Kibana is a visualization UI layer that works on top of Elasticsearch.
+
+
+how to implement
+
+step 1 : download kibana,logstash and elastic from following link
+https://www.elastic.co/downloads/logstash
+https://www.elastic.co/downloads/kibana
+https://www.elastic.co/downloads/elasticsearch
+
+unzip all
+
+step 2 : 
+start elastic as follow
+elasticsearch.bat using the command prompt. Elasticsearch can then be accessed at localhost:9200
+
+uncomment the following line in kibana.yml-
+elasticsearch.host: "http://localhost:9200"
+
+start kibana as follow
+kibana.bat using the command prompt. 
+run localhost:5601
+
+create a file called logstash.conf and write the below content
+input {
+  file {
+    type => "java"
+    path => "C:/elk/spring-boot-elk.log"
+    codec => multiline {
+      pattern => "^%{YEAR}-%{MONTHNUM}-%{MONTHDAY} %{TIME}.*"
+      negate => "true"
+      what => "previous"
+    }
+  }
+}
+ 
+filter {
+  #If log line contains tab character followed by 'at' then we will tag that entry as stacktrace
+  if [message] =~ "\tat" {
+    grok {
+      match => ["message", "^(\tat)"]
+      add_tag => ["stacktrace"]
+    }
+  }
+ 
+}
+ 
+output {
+   
+  stdout {
+    codec => rubydebug
+  }
+ 
+  # Sending properly parsed log events to elasticsearch
+  elasticsearch {
+    hosts => ["localhost:9200"]
+  }
+}
+
+run logstash as follow
+logstash -f logstash.conf
+
+
+step 3 :
+
+now go to your application and write the log as follow
+
+private static final Logger LOG = Logger.getLogger(ELKController.class.getName());
+
+
+@RequestMapping(value = "/elk")
+	public String helloWorld() {
+		String response = "i will come in log file check my location from properties file" + new Date();
+		LOG.log(Level.INFO, response);
+
+		return response;
+	}
+
+	@RequestMapping(value = "/exception")
+	public String exception() {
+		String response = "";
+		try {
+			throw new Exception("Exception has occured....");
+		} catch (Exception e) {
+			e.printStackTrace();
+			LOG.error(e);
+
+			StringWriter sw = new StringWriter();
+			PrintWriter pw = new PrintWriter(sw);
+			e.printStackTrace(pw);
+			String stackTrace = sw.toString();
+			LOG.error("Exception - " + stackTrace);
+			response = stackTrace;
+		}
+
+		return response;
+	}
+
+step 4
+
+go to application.properties file and write the following line
+
+logging.file=C:/elk/spring-boot-elk.log
+
+
